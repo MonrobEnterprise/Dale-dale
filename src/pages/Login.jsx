@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import logoPinata from '../assets/logo-pinata.png'
 
 export default function Login() {
   const { session, login } = useAuth()
@@ -30,6 +31,7 @@ export default function Login() {
     <div className="flex min-h-screen items-center justify-center bg-crema px-4">
       <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-lg">
         <div className="mb-6 text-center">
+          <img src={logoPinata} alt="Dale, dale!!" className="mx-auto h-24 w-auto" />
           <h1 className="text-2xl font-bold text-navy">¡Dale, dale!!</h1>
           <p className="mt-1 text-sm text-navy/70">¡No pierdas el tino!</p>
         </div>
