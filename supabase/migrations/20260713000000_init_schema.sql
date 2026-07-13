@@ -134,10 +134,11 @@ create table pagos (
 create or replace function public.set_venta_folio()
 returns trigger
 language plpgsql
+set search_path = ''
 as $$
 begin
   if new.folio is null then
-    new.folio := 'DD-' || lpad(nextval('ventas_folio_seq')::text, 6, '0');
+    new.folio := 'DD-' || lpad(nextval('public.ventas_folio_seq')::text, 6, '0');
   end if;
   return new;
 end;
@@ -152,13 +153,14 @@ create trigger trg_set_venta_folio
 create or replace function public.check_corte_abierto()
 returns trigger
 language plpgsql
+set search_path = ''
 as $$
 declare
   v_estado text;
   v_usuario uuid;
 begin
   select estado, usuario_id into v_estado, v_usuario
-  from cortes_caja
+  from public.cortes_caja
   where id = new.corte_id;
 
   if v_estado is null then
@@ -462,6 +464,23 @@ grant select, insert, update on ventas to authenticated;
 grant select, insert on venta_detalle to authenticated;
 grant select, insert on pagos to authenticated;
 grant usage on all sequences in schema public to authenticated;
+
+-- Supabase otorga EXECUTE explícito a anon/authenticated/service_role en
+-- funciones nuevas del schema public (aparte del grant a PUBLIC), así que
+-- para funciones que no deben ser invocables directo hay que revocarlo por
+-- rol, no sólo `from public`.
+--
+-- descontar_stock / reponer_stock_cancelacion son funciones `trigger`: nadie
+-- puede invocarlas via RPC de todos modos (Postgres lo bloquea), y el motor
+-- de triggers no pasa por el chequeo de EXECUTE, así que revocar de todos
+-- los roles no afecta que los triggers sigan disparando.
+revoke execute on function public.descontar_stock() from anon, authenticated, service_role;
+revoke execute on function public.reponer_stock_cancelacion() from anon, authenticated, service_role;
+
+-- current_rol: anon no la necesita (no filtra nada, pero tampoco hay razón
+-- para dejarla abierta); authenticated sí la necesita para que las policies
+-- de RLS puedan evaluarla.
+revoke execute on function public.current_rol() from anon, service_role;
 
 -- =========================================================================
 -- 8. BOOTSTRAP DEL PRIMER ADMIN
