@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Baloo 2", "Poppins", ui-rounded, sans-serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+
+  --color-navy: #14315c;
+  --color-coral: #f26a5c;
+  --color-dorado: #f5b942;
+  --color-menta: #7ac4b6;
+  --color-crema: #faf3e6;
+}
+
+body {
+  margin: 0;
+  background: var(--color-crema);
+  color: var(--color-navy);
+  font-family: var(--font-sans);
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+}
