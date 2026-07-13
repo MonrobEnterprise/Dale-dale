@@ -211,6 +211,97 @@ create trigger trg_descontar_stock
   for each row
   execute function public.descontar_stock();
 
+-- Repone stock al cancelar una venta (transición completada -> cancelada).
+-- Idempotente por construcción: sólo dispara en esa transición exacta, así
+-- que cancelar una venta que ya está cancelada no vuelve a sumar stock.
+--
+-- Se agrega por variante_id con una subconsulta (sum + group by) en vez de
+-- un UPDATE ... FROM venta_detalle directo: si una venta tuviera dos filas
+-- de venta_detalle para la misma variante, un UPDATE ... FROM con múltiples
+-- filas fuente que matchean la misma fila destino sólo aplica una de ellas
+-- (no las acumula), y esto pasaría silenciosamente sin error.
+--
+-- security definer, mismo patrón acotado que descontar_stock(): hoy sólo el
+-- admin puede cambiar `estado` (ver ventas_update_admin), pero no queremos
+-- que este trigger dependa de que el invocador tenga UPDATE directo en
+-- `variantes` — igual que la venta original, es una mutación controlada por
+-- el propio trigger, no por input libre del usuario.
+create or replace function public.reponer_stock_cancelacion()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if old.estado = 'completada' and new.estado = 'cancelada' then
+    update public.variantes v
+    set stock = v.stock + agg.total_cantidad
+    from (
+      select variante_id, sum(cantidad) as total_cantidad
+      from public.venta_detalle
+      where venta_id = new.id
+      group by variante_id
+    ) agg
+    where v.id = agg.variante_id;
+  end if;
+
+  return new;
+end;
+$$;
+
+create trigger trg_reponer_stock_cancelacion
+  after update on ventas
+  for each row
+  execute function public.reponer_stock_cancelacion();
+
+-- Valida que los pagos de una venta cubran el total antes de que la
+-- transacción confirme. Los pagos (uno o varios, por método) se insertan
+-- después de `ventas`, en la misma transacción del checkout — por eso es un
+-- constraint trigger DEFERRABLE INITIALLY DEFERRED: se ejecuta una sola vez
+-- al final de la transacción (COMMIT), cuando ya existen todas las filas de
+-- `pagos` de esa venta, en vez de fallar en cada INSERT parcial mientras se
+-- va dividiendo el pago entre efectivo/tarjeta/transferencia.
+--
+-- Importante para el frontend: todas las filas de pago de una venta deben
+-- insertarse en una sola llamada (`supabase.from('pagos').insert([...])`
+-- con un arreglo), no una por una — cada request de PostgREST es su propia
+-- transacción, y si se insertan por separado este trigger vería sólo el
+-- pago parcial de cada request individual y rechazaría la primera.
+--
+-- No usa security definer: sólo lee `ventas` y `pagos`, y el usuario que
+-- inserta pagos ya tiene SELECT sobre su propia venta y sus propios pagos
+-- vía RLS (a diferencia de descontar_stock/reponer_stock_cancelacion, que
+-- necesitan escribir en `variantes`, tabla que el cajero no puede tocar
+-- directamente).
+create or replace function public.validar_pagos_completos()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_total numeric(10,2);
+  v_pagado numeric(10,2);
+begin
+  select total into v_total from public.ventas where id = new.venta_id;
+
+  select coalesce(sum(monto), 0) into v_pagado
+  from public.pagos
+  where venta_id = new.venta_id;
+
+  if v_pagado <> v_total then
+    raise exception 'Los pagos ($%) no cubren el total de la venta ($%).', v_pagado, v_total;
+  end if;
+
+  return new;
+end;
+$$;
+
+create constraint trigger trg_validar_pagos_completos
+  after insert on pagos
+  deferrable initially deferred
+  for each row
+  execute function public.validar_pagos_completos();
+
 -- =========================================================================
 -- 5. ROW LEVEL SECURITY
 -- =========================================================================

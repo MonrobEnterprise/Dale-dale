@@ -19,6 +19,8 @@ dist-ssr
 contraseña*.txt
 *password*.txt
 *contraseña*
+*token*.txt
+gittken.txt
 
 # Editor directories and files
 .vscode/*
