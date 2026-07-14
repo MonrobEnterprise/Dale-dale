@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import logoPinata from '../assets/logo-pinata.png'
 
 const ADMIN_LINKS = [
   { to: '/admin', label: 'Panel', end: true },
@@ -13,7 +14,10 @@ export function AppShell({ children }) {
   return (
     <div className="min-h-screen bg-crema">
       <header className="flex items-center justify-between bg-navy px-6 py-4 text-white">
-        <h1 className="text-lg font-bold">¡Dale, dale!!</h1>
+        <div className="flex items-center gap-2">
+          <img src={logoPinata} alt="" className="h-9 w-auto" />
+          <h1 className="text-lg font-bold">¡Dale, dale!!</h1>
+        </div>
         <div className="flex items-center gap-4 text-sm">
           {perfil && (
             <span>
