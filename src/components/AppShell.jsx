@@ -1,4 +1,11 @@
+import { NavLink } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+
+const ADMIN_LINKS = [
+  { to: '/admin', label: 'Panel', end: true },
+  { to: '/admin/catalogo', label: 'Catálogo' },
+  { to: '/admin/inventario', label: 'Inventario' },
+]
 
 export function AppShell({ children }) {
   const { perfil, logout } = useAuth()
@@ -21,6 +28,22 @@ export function AppShell({ children }) {
           </button>
         </div>
       </header>
+      {perfil?.rol === 'admin' && (
+        <nav className="flex gap-4 border-b border-navy/10 bg-white px-6 py-2 text-sm">
+          {ADMIN_LINKS.map((link) => (
+            <NavLink
+              key={link.to}
+              to={link.to}
+              end={link.end}
+              className={({ isActive }) =>
+                'font-medium ' + (isActive ? 'text-coral' : 'text-navy/60 hover:text-navy')
+              }
+            >
+              {link.label}
+            </NavLink>
+          ))}
+        </nav>
+      )}
       <main className="p-6">{children}</main>
     </div>
   )
