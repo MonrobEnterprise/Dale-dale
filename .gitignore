@@ -32,3 +32,5 @@ gittken.txt
 *.njsproj
 *.sln
 *.sw?
+
+.vercel
