@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabaseClient'
 import { friendlyError } from '../../lib/errorMessages'
 import { DataTable } from '../../components/admin/DataTable'
 import { FormField } from '../../components/admin/FormField'
+import { varianteLabel } from '../../lib/varianteLabel'
 
 const CANTIDAD_LABEL = {
   entrada: 'Cantidad a agregar',
@@ -16,11 +17,6 @@ const TIPO_COLOR = {
   entrada: 'text-menta',
   salida: 'text-coral',
   ajuste: 'text-dorado',
-}
-
-function varianteLabel(v) {
-  const desc = [v.tamano, v.color, v.tema].filter(Boolean).join(' · ')
-  return [v.productos?.nombre, desc, v.sku ? `SKU ${v.sku}` : null].filter(Boolean).join(' — ')
 }
 
 export default function InventarioAdmin() {

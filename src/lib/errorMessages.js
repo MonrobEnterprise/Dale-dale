@@ -11,7 +11,15 @@ export function friendlyError(err, fallback = 'No se pudo guardar. Verifica los 
   }
 
   if (/Stock insuficiente/i.test(message)) {
-    return 'No hay stock suficiente para registrar esa salida.'
+    return 'No hay stock suficiente para completar la operación.'
+  }
+
+  if (/no está abierta|corte de caja indicado no existe/i.test(message)) {
+    return 'La caja no está abierta. Vuelve a abrirla e intenta de nuevo.'
+  }
+
+  if (/no cubren el total/i.test(message)) {
+    return 'Los pagos capturados no cubren el total de la venta.'
   }
 
   return fallback

@@ -1,12 +1,39 @@
+import { useEffect, useState } from 'react'
 import { AppShell } from '../components/AppShell'
+import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../lib/supabaseClient'
+import AperturaCaja from './venta/AperturaCaja'
+import PuntoVenta from './venta/PuntoVenta'
 
 export default function CajeroHome() {
+  const { user } = useAuth()
+  const [corte, setCorte] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function loadCorte() {
+      setLoading(true)
+      const { data } = await supabase
+        .from('cortes_caja')
+        .select('*')
+        .eq('usuario_id', user.id)
+        .eq('estado', 'abierta')
+        .maybeSingle()
+      setCorte(data ?? null)
+      setLoading(false)
+    }
+    loadCorte()
+  }, [user.id])
+
   return (
     <AppShell>
-      <h2 className="text-xl font-semibold text-navy">Punto de venta</h2>
-      <p className="mt-2 text-navy/70">
-        La apertura de caja y la pantalla de venta llegarán en las siguientes fases.
-      </p>
+      {loading ? (
+        <p className="text-navy/60">Cargando…</p>
+      ) : corte ? (
+        <PuntoVenta corte={corte} />
+      ) : (
+        <AperturaCaja onAbierta={setCorte} />
+      )}
     </AppShell>
   )
 }
