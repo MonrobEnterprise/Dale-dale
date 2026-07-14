@@ -33,9 +33,18 @@ export function AuthProvider({ children }) {
       loadPerfil(session?.user?.id).finally(() => setLoading(false))
     })
 
+    // `loading` debe cubrir también la recarga de perfil que dispara cada
+    // evento de auth (login, logout, refresh de token), no sólo el arranque
+    // inicial: si no, hay una ventana justo después del login donde
+    // `session` ya es verdadero pero `perfil` todavía es null porque este
+    // fetch no ha resuelto, y los consumidores de useAuth() (RoleRedirect,
+    // ProtectedRoute) la interpretan como "sin rol" y redirigen a /login,
+    // que a su vez redirige de vuelta a "/" por tener sesión — un ping-pong
+    // que React corta con "Maximum update depth exceeded".
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
-      loadPerfil(session?.user?.id)
+      setLoading(true)
+      loadPerfil(session?.user?.id).finally(() => setLoading(false))
     })
 
     return () => listener.subscription.unsubscribe()
