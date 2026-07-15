@@ -5,6 +5,7 @@ import { FormField } from '../../components/admin/FormField'
 import { DataTable } from '../../components/admin/DataTable'
 import PagoModal from './PagoModal'
 import CierreCaja from './CierreCaja'
+import ReimprimirTicket from './ReimprimirTicket'
 
 // Un descuento por encima de este porcentaje del subtotal exige confirmación
 // explícita antes de aplicarse, por si se capturó un valor por error.
@@ -25,6 +26,7 @@ export default function PuntoVenta({ corte, onCerrarCaja }) {
 
   const [pagoAbierto, setPagoAbierto] = useState(false)
   const [cierreAbierto, setCierreAbierto] = useState(false)
+  const [reimprimirAbierto, setReimprimirAbierto] = useState(false)
   const [mensajeExito, setMensajeExito] = useState(null)
 
   const searchInputRef = useRef(null)
@@ -35,10 +37,10 @@ export default function PuntoVenta({ corte, onCerrarCaja }) {
   // agrega directo al carrito. Un tecleo manual que no matchee un SKU exacto
   // simplemente deja la búsqueda de texto normal como está.
   useEffect(() => {
-    if (!pagoAbierto && !cierreAbierto) {
+    if (!pagoAbierto && !cierreAbierto && !reimprimirAbierto) {
       searchInputRef.current?.focus()
     }
-  }, [pagoAbierto, cierreAbierto])
+  }, [pagoAbierto, cierreAbierto, reimprimirAbierto])
 
   async function loadVariantes() {
     const { data } = await supabase
@@ -192,13 +194,22 @@ export default function PuntoVenta({ corte, onCerrarCaja }) {
             {money(corte.efectivo_inicial)}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setCierreAbierto(true)}
-          className="rounded-lg px-3 py-1.5 text-sm font-medium text-navy/70 hover:bg-navy/5"
-        >
-          Cerrar caja
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setReimprimirAbierto(true)}
+            className="rounded-lg px-3 py-1.5 text-sm font-medium text-navy/70 hover:bg-navy/5"
+          >
+            Reimprimir ticket
+          </button>
+          <button
+            type="button"
+            onClick={() => setCierreAbierto(true)}
+            className="rounded-lg px-3 py-1.5 text-sm font-medium text-navy/70 hover:bg-navy/5"
+          >
+            Cerrar caja
+          </button>
+        </div>
       </div>
 
       {mensajeExito && (
@@ -313,6 +324,10 @@ export default function PuntoVenta({ corte, onCerrarCaja }) {
           corte={corte}
           onCerrado={onCerrarCaja}
         />
+      )}
+
+      {reimprimirAbierto && (
+        <ReimprimirTicket open={reimprimirAbierto} onClose={() => setReimprimirAbierto(false)} />
       )}
     </div>
   )

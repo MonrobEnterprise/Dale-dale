@@ -4,12 +4,14 @@ function money(n) {
   return `$${Number(n).toFixed(2)}`
 }
 
-export default function Ticket({ folio, fecha, cajero, carrito, subtotal, descuento, total, pagos }) {
+export default function Ticket({ folio, fecha, cajero, carrito, subtotal, descuento, total, pagos, esCopia, cancelada }) {
   return (
     <div className="ticket-print mx-auto w-[58mm] bg-white p-2 text-[11px] leading-tight text-navy">
       <div className="mb-2 text-center">
         <img src={logoPinata} alt="" className="mx-auto h-12 w-auto" />
         <p className="font-display text-sm font-bold">¡Dale, dale!!</p>
+        {esCopia && <p className="font-semibold text-navy/60">(Copia)</p>}
+        {cancelada && <p className="font-semibold text-coral">VENTA CANCELADA</p>}
       </div>
 
       <div className="mb-2 space-y-0.5 border-b border-navy/30 pb-2">
