@@ -36,8 +36,9 @@ export default function InventarioAdmin() {
   async function loadVariantes() {
     const { data } = await supabase
       .from('variantes')
-      .select('id, sku, tamano, color, tema, stock, productos(nombre)')
+      .select('id, sku, tamano, color, tema, stock, productos!inner(nombre)')
       .eq('activo', true)
+      .eq('productos.activo', true)
       .order('id')
     setVariantes(data ?? [])
   }

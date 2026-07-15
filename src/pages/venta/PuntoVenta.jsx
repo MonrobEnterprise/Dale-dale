@@ -30,8 +30,9 @@ export default function PuntoVenta({ corte, onCerrarCaja }) {
   async function loadVariantes() {
     const { data } = await supabase
       .from('variantes')
-      .select('id, sku, tamano, color, tema, precio, stock, productos(nombre)')
+      .select('id, sku, tamano, color, tema, precio, stock, productos!inner(nombre)')
       .eq('activo', true)
+      .eq('productos.activo', true)
       .order('id')
     setVariantes(data ?? [])
   }

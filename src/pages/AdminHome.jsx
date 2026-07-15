@@ -12,17 +12,19 @@ const CARDS = [
     title: 'Inventario',
     description: 'Registra entradas, salidas y ajustes de stock.',
   },
+  {
+    to: '/admin/reportes',
+    title: 'Reportes',
+    description: 'Ventas por período, productos más vendidos y cortes de caja.',
+  },
 ]
 
 export default function AdminHome() {
   return (
     <AppShell>
       <h2 className="text-xl font-semibold text-navy">Panel de administración</h2>
-      <p className="mt-2 text-navy/70">
-        Cortes de caja y reportes llegarán en las siguientes fases.
-      </p>
 
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
         {CARDS.map((card) => (
           <Link
             key={card.to}
