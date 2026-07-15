@@ -6,6 +6,7 @@ const ADMIN_LINKS = [
   { to: '/admin', label: 'Panel', end: true },
   { to: '/admin/catalogo', label: 'Catálogo' },
   { to: '/admin/inventario', label: 'Inventario' },
+  { to: '/venta', label: 'Venta' },
 ]
 
 export function AppShell({ children }) {
