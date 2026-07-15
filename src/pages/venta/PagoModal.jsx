@@ -1,20 +1,24 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { friendlyError } from '../../lib/errorMessages'
+import { useAuth } from '../../contexts/AuthContext'
 import { Modal } from '../../components/admin/Modal'
 import { FormField } from '../../components/admin/FormField'
+import Ticket from './Ticket'
 
 function money(n) {
   return `$${Number(n).toFixed(2)}`
 }
 
-export default function PagoModal({ open, onClose, total, descuento, carrito, corteId, onSuccess }) {
+export default function PagoModal({ open, onClose, total, subtotal, descuento, carrito, corteId, onSuccess }) {
+  const { perfil } = useAuth()
   const [tarjeta, setTarjeta] = useState('0')
   const [transferencia, setTransferencia] = useState('0')
   const [efectivoRecibido, setEfectivoRecibido] = useState('0')
   const [error, setError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [folio, setFolio] = useState(null)
+  const [fechaVenta, setFechaVenta] = useState(null)
 
   const tarjetaNum = Number(tarjeta) || 0
   const transferenciaNum = Number(transferencia) || 0
@@ -54,6 +58,7 @@ export default function PagoModal({ open, onClose, total, descuento, carrito, co
       })
       if (rpcError) throw rpcError
       setFolio(data?.[0]?.folio ?? null)
+      setFechaVenta(new Date())
     } catch (err) {
       setError(friendlyError(err, 'No se pudo completar la venta. Verifica los datos e intenta de nuevo.'))
     } finally {
@@ -68,13 +73,36 @@ export default function PagoModal({ open, onClose, total, descuento, carrito, co
           <p className="mb-4 text-navy">
             Venta registrada con folio <span className="font-semibold">{folio}</span>.
           </p>
-          <button
-            type="button"
-            onClick={() => onSuccess(folio)}
-            className="w-full rounded-lg bg-coral py-2 font-semibold text-white transition hover:brightness-95"
-          >
-            Nueva venta
-          </button>
+
+          <div className="mb-4 max-h-96 overflow-y-auto rounded-lg border border-navy/10 bg-navy/5 p-3">
+            <Ticket
+              folio={folio}
+              fecha={fechaVenta?.toLocaleString('es-MX')}
+              cajero={perfil?.nombre ?? '—'}
+              carrito={carrito}
+              subtotal={subtotal}
+              descuento={descuento}
+              total={total}
+              pagos={{ efectivo: efectivoAplicado, tarjeta: tarjetaNum, transferencia: transferenciaNum, cambio }}
+            />
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="flex-1 rounded-lg bg-navy/10 py-2 font-medium text-navy hover:bg-navy/20"
+            >
+              Imprimir ticket
+            </button>
+            <button
+              type="button"
+              onClick={() => onSuccess(folio)}
+              className="flex-1 rounded-lg bg-coral py-2 font-semibold text-white transition hover:brightness-95"
+            >
+              Nueva venta
+            </button>
+          </div>
         </div>
       ) : (
         <div>

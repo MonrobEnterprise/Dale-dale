@@ -21,3 +21,29 @@ body {
 h1, h2, h3, h4 {
   font-family: var(--font-display);
 }
+
+/* Impresión de tickets (impresora térmica 58mm). Se usan mm (no px) tanto en
+   @page como en el ancho del ticket para que el tamaño sea exacto sin
+   depender de la resolución de pantalla del navegador. */
+@media print {
+  html, body {
+    visibility: hidden;
+    background: white;
+  }
+  body * {
+    visibility: hidden;
+  }
+  .ticket-print,
+  .ticket-print * {
+    visibility: visible;
+  }
+  .ticket-print {
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+  @page {
+    size: 58mm auto;
+    margin: 0;
+  }
+}

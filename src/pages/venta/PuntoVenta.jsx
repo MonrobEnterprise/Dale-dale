@@ -273,6 +273,7 @@ export default function PuntoVenta({ corte, onCerrarCaja }) {
           open={pagoAbierto}
           onClose={() => setPagoAbierto(false)}
           total={total}
+          subtotal={subtotal}
           descuento={descuentoAplicado}
           carrito={carrito}
           corteId={corte.id}
