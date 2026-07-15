@@ -1,8 +1,18 @@
 import { useEffect, useState } from 'react'
 import * as XLSX from 'xlsx'
+import ExcelJS from 'exceljs'
 import { supabase } from '../../../lib/supabaseClient'
 import { friendlyError } from '../../../lib/errorMessages'
 import { DataTable } from '../../../components/admin/DataTable'
+import logoPinata from '../../../assets/logo-pinata.png'
+
+// Paleta institucional (misma que src/index.css) usada también en la
+// plantilla descargable, para que se vea consistente con el resto de la app.
+const COLOR_NAVY = 'FF14315C'
+const COLOR_CORAL = 'FFF26A5C'
+const COLOR_BORDE = 'FFE0DACD' // crema oscurecido, para gridlines discretos
+
+const FILAS_VACIAS_PLANTILLA = 50
 
 const COLUMNAS_PLANTILLA = [
   'categoria',
@@ -69,11 +79,103 @@ export default function ImportarExcelTab() {
     loadCache()
   }, [])
 
-  function descargarPlantilla() {
-    const ws = XLSX.utils.aoa_to_sheet([COLUMNAS_PLANTILLA])
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Catalogo')
-    XLSX.writeFile(wb, 'plantilla-catalogo-dale-dale.xlsx')
+  async function cargarLogoBase64() {
+    const res = await fetch(logoPinata)
+    const blob = await res.blob()
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onloadend = () => resolve(String(reader.result).split(',')[1])
+      reader.onerror = reject
+      reader.readAsDataURL(blob)
+    })
+  }
+
+  async function descargarPlantilla() {
+    const workbook = new ExcelJS.Workbook()
+    const sheet = workbook.addWorksheet('Inventario')
+
+    sheet.columns = [
+      { key: 'categoria', width: 16 },
+      { key: 'producto', width: 30 },
+      { key: 'descripcion', width: 32 },
+      { key: 'tamano', width: 12 },
+      { key: 'color', width: 12 },
+      { key: 'tema', width: 12 },
+      { key: 'sku', width: 18 },
+      { key: 'precio', width: 12 },
+      { key: 'costo', width: 12 },
+      { key: 'stock', width: 10 },
+      { key: 'stock_minimo', width: 14 },
+    ]
+
+    const bordeClaro = {
+      top: { style: 'thin', color: { argb: COLOR_BORDE } },
+      left: { style: 'thin', color: { argb: COLOR_BORDE } },
+      bottom: { style: 'thin', color: { argb: COLOR_BORDE } },
+      right: { style: 'thin', color: { argb: COLOR_BORDE } },
+    }
+
+    // Encabezado: logo (col. A, filas 1-2) + título (col. B-K, filas 1-2),
+    // fondo navy institucional — mismo esquema de color que el header de la app.
+    sheet.mergeCells('A1:A2')
+    sheet.mergeCells('B1:K2')
+    sheet.getRow(1).height = 30
+    sheet.getRow(2).height = 30
+
+    sheet.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLOR_NAVY } }
+
+    const tituloCelda = sheet.getCell('B1')
+    tituloCelda.value = 'Inventario de Productos'
+    tituloCelda.font = { bold: true, size: 16, color: { argb: 'FFFFFFFF' } }
+    tituloCelda.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
+    tituloCelda.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLOR_NAVY } }
+
+    const logoBase64 = await cargarLogoBase64()
+    const imageId = workbook.addImage({ base64: logoBase64, extension: 'png' })
+    sheet.addImage(imageId, { tl: { col: 0.15, row: 0.15 }, ext: { width: 48, height: 48 } })
+
+    // Encabezados de columna: fondo coral institucional, texto centrado y
+    // envuelto para que ningún nombre de columna se corte.
+    const headerRow = sheet.getRow(3)
+    headerRow.values = COLUMNAS_PLANTILLA
+    headerRow.height = 26
+    headerRow.eachCell((cell) => {
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } }
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLOR_CORAL } }
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
+      cell.border = bordeClaro
+    })
+
+    // Filas de datos vacías, preformateadas: centradas, con texto envuelto y
+    // formato numérico correcto para que quede igual sin importar qué tanto
+    // capture el usuario en cada celda. Sin altura fija a propósito: con
+    // wrapText activo, Excel expande la fila automáticamente según el texto
+    // que se capture, en vez de recortarlo a una altura predefinida.
+    for (let i = 4; i <= 3 + FILAS_VACIAS_PLANTILLA; i++) {
+      const row = sheet.getRow(i)
+      for (let col = 1; col <= COLUMNAS_PLANTILLA.length; col++) {
+        const cell = row.getCell(col)
+        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
+        cell.border = bordeClaro
+      }
+      row.getCell(8).numFmt = '0.00' // precio
+      row.getCell(9).numFmt = '0.00' // costo
+      row.getCell(10).numFmt = '0' // stock
+      row.getCell(11).numFmt = '0' // stock_minimo
+    }
+
+    sheet.views = [{ state: 'frozen', ySplit: 3 }]
+
+    const buffer = await workbook.xlsx.writeBuffer()
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'plantilla-catalogo-dale-dale.xlsx'
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   function validarFilas(rows) {
