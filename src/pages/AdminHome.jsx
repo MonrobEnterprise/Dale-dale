@@ -17,6 +17,11 @@ const CARDS = [
     title: 'Reportes',
     description: 'Ventas por período, productos más vendidos y cortes de caja.',
   },
+  {
+    to: '/admin/usuarios',
+    title: 'Usuarios',
+    description: 'Crea cajeros, asigna roles y activa o desactiva cuentas.',
+  },
 ]
 
 export default function AdminHome() {
@@ -24,7 +29,7 @@ export default function AdminHome() {
     <AppShell>
       <h2 className="text-xl font-semibold text-navy">Panel de administración</h2>
 
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {CARDS.map((card) => (
           <Link
             key={card.to}

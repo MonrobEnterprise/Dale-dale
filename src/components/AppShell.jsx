@@ -7,6 +7,7 @@ const ADMIN_LINKS = [
   { to: '/admin/catalogo', label: 'Catálogo' },
   { to: '/admin/inventario', label: 'Inventario' },
   { to: '/admin/reportes', label: 'Reportes' },
+  { to: '/admin/usuarios', label: 'Usuarios' },
   { to: '/venta', label: 'Venta' },
 ]
 

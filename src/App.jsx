@@ -7,6 +7,7 @@ import CajeroHome from './pages/CajeroHome'
 import CatalogoAdmin from './pages/admin/CatalogoAdmin'
 import InventarioAdmin from './pages/admin/InventarioAdmin'
 import ReportesAdmin from './pages/admin/ReportesAdmin'
+import UsuariosAdmin from './pages/admin/UsuariosAdmin'
 
 function RoleRedirect() {
   const { perfil, loading } = useAuth()
@@ -52,6 +53,14 @@ export default function App() {
             element={
               <ProtectedRoute roles={['admin']}>
                 <ReportesAdmin />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/usuarios"
+            element={
+              <ProtectedRoute roles={['admin']}>
+                <UsuariosAdmin />
               </ProtectedRoute>
             }
           />
