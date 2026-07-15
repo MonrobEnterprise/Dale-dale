@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { varianteLabel } from '../../lib/varianteLabel'
 import { FormField } from '../../components/admin/FormField'
@@ -26,6 +26,19 @@ export default function PuntoVenta({ corte, onCerrarCaja }) {
   const [pagoAbierto, setPagoAbierto] = useState(false)
   const [cierreAbierto, setCierreAbierto] = useState(false)
   const [mensajeExito, setMensajeExito] = useState(null)
+
+  const searchInputRef = useRef(null)
+
+  // Lector de código de barras USB: emula teclado y termina con Enter. En vez
+  // de intentar distinguirlo de tecleo manual (heurísticas de velocidad son
+  // frágiles y varían por modelo de lector), basta con: SKU exacto + Enter
+  // agrega directo al carrito. Un tecleo manual que no matchee un SKU exacto
+  // simplemente deja la búsqueda de texto normal como está.
+  useEffect(() => {
+    if (!pagoAbierto && !cierreAbierto) {
+      searchInputRef.current?.focus()
+    }
+  }, [pagoAbierto, cierreAbierto])
 
   async function loadVariantes() {
     const { data } = await supabase
@@ -63,6 +76,16 @@ export default function PuntoVenta({ corte, onCerrarCaja }) {
       ]
     })
     setSearch('')
+    searchInputRef.current?.focus()
+  }
+
+  function handleSearchKeyDown(e) {
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    const q = search.trim().toLowerCase()
+    if (!q) return
+    const match = variantes.find((v) => v.sku && v.sku.toLowerCase() === q)
+    if (match) agregarAlCarrito(match)
   }
 
   function cambiarCantidad(varianteId, delta) {
@@ -186,10 +209,12 @@ export default function PuntoVenta({ corte, onCerrarCaja }) {
 
       <div className="relative mb-6 max-w-md">
         <FormField
+          ref={searchInputRef}
           label="Buscar producto"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Busca por producto, SKU, tamaño, color o tema…"
+          onKeyDown={handleSearchKeyDown}
+          placeholder="Busca por producto, SKU, tamaño, color o tema… (o escanea)"
         />
         {resultados.length > 0 && (
           <ul className="absolute z-10 mt-1 w-full rounded-lg border border-navy/10 bg-white shadow-lg">
