@@ -4,6 +4,7 @@ import { varianteLabel } from '../../lib/varianteLabel'
 import { FormField } from '../../components/admin/FormField'
 import { DataTable } from '../../components/admin/DataTable'
 import PagoModal from './PagoModal'
+import CierreCaja from './CierreCaja'
 
 // Un descuento por encima de este porcentaje del subtotal exige confirmación
 // explícita antes de aplicarse, por si se capturó un valor por error.
@@ -13,7 +14,7 @@ function money(n) {
   return `$${Number(n).toFixed(2)}`
 }
 
-export default function PuntoVenta({ corte }) {
+export default function PuntoVenta({ corte, onCerrarCaja }) {
   const [variantes, setVariantes] = useState([])
   const [search, setSearch] = useState('')
   const [carrito, setCarrito] = useState([])
@@ -23,6 +24,7 @@ export default function PuntoVenta({ corte }) {
   const [descuentoAplicado, setDescuentoAplicado] = useState(0)
 
   const [pagoAbierto, setPagoAbierto] = useState(false)
+  const [cierreAbierto, setCierreAbierto] = useState(false)
   const [mensajeExito, setMensajeExito] = useState(null)
 
   async function loadVariantes() {
@@ -158,11 +160,22 @@ export default function PuntoVenta({ corte }) {
 
   return (
     <div>
-      <h2 className="mb-1 text-xl font-semibold text-navy">Punto de venta</h2>
-      <p className="mb-4 text-sm text-navy/70">
-        Caja abierta desde {new Date(corte.fecha_apertura).toLocaleString('es-MX')} · fondo inicial{' '}
-        {money(corte.efectivo_inicial)}
-      </p>
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-navy">Punto de venta</h2>
+          <p className="text-sm text-navy/70">
+            Caja abierta desde {new Date(corte.fecha_apertura).toLocaleString('es-MX')} · fondo inicial{' '}
+            {money(corte.efectivo_inicial)}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setCierreAbierto(true)}
+          className="rounded-lg px-3 py-1.5 text-sm font-medium text-navy/70 hover:bg-navy/5"
+        >
+          Cerrar caja
+        </button>
+      </div>
 
       {mensajeExito && (
         <div className="mb-4 rounded-lg bg-menta/20 px-4 py-3 text-sm font-medium text-navy">
@@ -263,6 +276,15 @@ export default function PuntoVenta({ corte }) {
           carrito={carrito}
           corteId={corte.id}
           onSuccess={handleVentaExitosa}
+        />
+      )}
+
+      {cierreAbierto && (
+        <CierreCaja
+          open={cierreAbierto}
+          onClose={() => setCierreAbierto(false)}
+          corte={corte}
+          onCerrado={onCerrarCaja}
         />
       )}
     </div>

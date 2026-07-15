@@ -30,7 +30,7 @@ export default function CajeroHome() {
       {loading ? (
         <p className="text-navy/60">Cargando…</p>
       ) : corte ? (
-        <PuntoVenta corte={corte} />
+        <PuntoVenta corte={corte} onCerrarCaja={() => setCorte(null)} />
       ) : (
         <AperturaCaja onAbierta={setCorte} />
       )}
