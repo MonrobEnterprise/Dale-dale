@@ -22,19 +22,27 @@ h1, h2, h3, h4 {
   font-family: var(--font-display);
 }
 
-/* .price-list-print vive fuera de pantalla (no basta con "hidden" de
-   Tailwind: display:none no se puede revertir con visibility en el
-   @media print de abajo). Sólo se muestra durante la impresión. */
+/* .price-list-print no se muestra en pantalla; sólo existe para @media
+   print. display:none (no visibility) porque así no reserva espacio en
+   el layout normal de la pestaña. */
 .price-list-print {
-  position: absolute;
-  left: -9999px;
-  top: 0;
+  display: none;
 }
 
 /* Impresión de tickets (impresora térmica 58mm) y de la lista de precios
-   (carta, a color). Cada una usa una @page con nombre porque el tamaño de
-   página en impresión no se puede condicionar con selectores normales — el
-   nombre se asigna al elemento imprimible vía la propiedad `page`. */
+   (carta, a color, con encabezado/pie repetidos en cada hoja).
+   Cada una usa una @page con nombre porque el tamaño de página en
+   impresión no se puede condicionar con selectores normales — el nombre
+   se asigna al elemento imprimible vía la propiedad `page`.
+
+   El ticket usa el approach visibility:hidden + position:absolute (un solo
+   bloque corto, nunca pasa de una página). La lista de precios NO puede
+   usar position:absolute: Chrome no pagina bien contenido posicionado de
+   forma absoluta que mide más de una página — el resultado son hojas en
+   blanco. En su lugar, todo lo que no sea el documento imprimible se saca
+   del flujo con display:none (vía :has/:not, sólo cuando existe un
+   .price-list-print en la página), y el documento fluye normal, paginando
+   como cualquier contenido largo. */
 @media print {
   html, body {
     visibility: hidden;
@@ -53,25 +61,32 @@ h1, h2, h3, h4 {
     position: absolute;
     top: 0;
     left: 0;
-  }
-  .price-list-print {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-  }
-  .ticket-print {
     page: ticket58;
-  }
-  .price-list-print {
-    page: listaPrecios;
   }
   @page ticket58 {
     size: 58mm auto;
     margin: 0;
   }
+
+  body:has(.price-list-print) *:not(.price-list-print, .price-list-print *) {
+    display: none !important;
+  }
+  .price-list-print {
+    display: block;
+    page: listaPrecios;
+  }
   @page listaPrecios {
     size: letter;
-    margin: 14mm;
+    margin: 12mm;
+  }
+  /* El documento es una <table> con <thead>/<tfoot>: es el único mecanismo
+     de impresión que Chrome repite de forma confiable en cada hoja cuando
+     el contenido ocupa varias páginas (position:fixed con @page no se
+     comporta de forma consistente entre páginas para esto). */
+  .price-list-print table {
+    page-break-inside: auto;
+  }
+  .price-list-print tr {
+    page-break-inside: avoid;
   }
 }
