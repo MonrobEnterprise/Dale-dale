@@ -28,15 +28,34 @@ const COLUMNAS_PLANTILLA = [
   'stock_minimo',
 ]
 
+// Nombre de encabezado esperado (ya normalizado: sin acentos, minúsculas) por
+// campo interno. La columna "sku" del Excel es el código de barras del
+// fabricante (ver comentario en handleFile) — no el sku interno del sistema.
+const ENCABEZADOS_ESPERADOS = {
+  categoria: 'categoria',
+  producto: 'producto',
+  descripcion: 'descripcion',
+  tamano: 'tamano',
+  color: 'color',
+  tema: 'tema',
+  sku: 'sku',
+  precio: 'precio',
+  costo: 'costo',
+  stock: 'stock',
+  stock_minimo: 'stock_minimo',
+}
+
 const ESTADO_BADGE = {
   nueva: 'bg-menta/20 text-menta',
   actualiza: 'bg-dorado/20 text-dorado',
+  conflicto: 'bg-navy/20 text-navy',
   error: 'bg-coral/20 text-coral',
 }
 
 const ESTADO_LABEL = {
   nueva: 'Nueva',
   actualiza: 'Actualiza existente',
+  conflicto: 'Variante repetida en el archivo',
   error: 'Error',
 }
 
@@ -44,17 +63,100 @@ function normalizar(v) {
   return String(v ?? '').trim()
 }
 
+// Para comparar (encabezados, categoría/producto existentes, combos de
+// variante): sin acentos y sin distinguir mayúsculas. Nunca se usa para lo
+// que se guarda o se muestra — sólo para decidir si dos valores son "el
+// mismo" dato capturado de formas distintas.
+function normalizarClave(v) {
+  return String(v ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+}
+
+// El catálogo real de Hugo usa el texto literal "S/S" (con variaciones de
+// mayúsculas/espacios) para "sin código de barras" — se trata como vacío.
+function esCodigoVacio(v) {
+  const c = normalizarClave(v).replace(/\s+/g, '')
+  return c === '' || c === 's/s'
+}
+
 function money(n) {
   return `$${Number(n).toFixed(2)}`
+}
+
+function comboKey(productoId, tamano, color, tema) {
+  return [productoId, normalizarClave(tamano), normalizarClave(color), normalizarClave(tema)].join('|')
+}
+
+// Lee la hoja "Inventario" (ignora cualquier otra hoja, como el "Hoja1" de
+// notas de gastos de Hugo). La primera fila es un título de sección, así que
+// se ubica la fila de encabezados reales buscando por nombre de columna en
+// vez de asumir un número de fila fijo — así aguanta si Hugo agrega o quita
+// filas arriba en el futuro.
+function leerHojaInventario(wb) {
+  const sheetName = wb.SheetNames.find((n) => normalizarClave(n) === 'inventario')
+  if (!sheetName) {
+    throw new Error('No se encontró la hoja "Inventario" en el archivo.')
+  }
+
+  const filasCrudas = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: '' })
+
+  const headerIdx = filasCrudas.findIndex((fila) => {
+    const normalizadas = fila.map(normalizarClave)
+    return normalizadas.includes('categoria') && normalizadas.includes('producto')
+  })
+  if (headerIdx === -1) {
+    throw new Error(
+      'No se encontraron los encabezados esperados (Categoria, Producto, …) en la hoja "Inventario".',
+    )
+  }
+
+  const encabezados = filasCrudas[headerIdx].map(normalizarClave)
+  const colIndex = {}
+  for (const [campo, nombreEsperado] of Object.entries(ENCABEZADOS_ESPERADOS)) {
+    colIndex[campo] = encabezados.indexOf(nombreEsperado)
+  }
+
+  const rows = []
+  for (let i = headerIdx + 1; i < filasCrudas.length; i++) {
+    const fila = filasCrudas[i]
+    const get = (campo) => {
+      const idx = colIndex[campo]
+      return idx == null || idx === -1 ? '' : (fila[idx] ?? '')
+    }
+
+    const categoria = normalizar(get('categoria'))
+    const producto = normalizar(get('producto'))
+    if (!categoria && !producto) continue // fila vacía de relleno (plantilla) — se ignora en silencio
+
+    rows.push({
+      rowNum: i + 1, // fila real del archivo (1-based)
+      categoria,
+      producto,
+      descripcion: get('descripcion'),
+      tamano: get('tamano'),
+      color: get('color'),
+      tema: get('tema'),
+      sku: get('sku'), // código de barras en el Excel de Hugo
+      precio: get('precio'),
+      costo: get('costo'),
+      stock: get('stock'),
+      stock_minimo: get('stock_minimo'),
+    })
+  }
+  return rows
 }
 
 export default function ImportarExcelTab() {
   const [categorias, setCategorias] = useState([])
   const [productos, setProductos] = useState([])
-  const [variantesSku, setVariantesSku] = useState(new Map())
+  const [variantesCombo, setVariantesCombo] = useState(new Map())
   const [loadingCache, setLoadingCache] = useState(true)
 
   const [filas, setFilas] = useState([])
+  const [errorArchivo, setErrorArchivo] = useState(null)
   const [procesando, setProcesando] = useState(false)
   const [resumen, setResumen] = useState(null)
 
@@ -63,21 +165,29 @@ export default function ImportarExcelTab() {
     const [catRes, prodRes, varRes] = await Promise.all([
       supabase.from('categorias').select('id, nombre'),
       supabase.from('productos').select('id, nombre, categoria_id'),
-      supabase.from('variantes').select('id, sku').not('sku', 'is', null),
+      supabase.from('variantes').select('id, producto_id, tamano, color, tema'),
     ])
     setCategorias(catRes.data ?? [])
     setProductos(prodRes.data ?? [])
     const mapa = new Map()
     for (const v of varRes.data ?? []) {
-      if (v.sku) mapa.set(v.sku.toLowerCase(), v)
+      mapa.set(comboKey(v.producto_id, v.tamano, v.color, v.tema), v)
     }
-    setVariantesSku(mapa)
+    setVariantesCombo(mapa)
     setLoadingCache(false)
   }
 
   useEffect(() => {
     loadCache()
   }, [])
+
+  function buscarProductoExistente(categoria, producto) {
+    const cat = categorias.find((c) => normalizarClave(c.nombre) === normalizarClave(categoria))
+    if (!cat) return null
+    return productos.find(
+      (p) => p.categoria_id === cat.id && normalizarClave(p.nombre) === normalizarClave(producto),
+    ) ?? null
+  }
 
   async function cargarLogoBase64() {
     const res = await fetch(logoPinata)
@@ -179,17 +289,19 @@ export default function ImportarExcelTab() {
   }
 
   function validarFilas(rows) {
-    const skuCount = new Map()
+    const conteoCombos = new Map()
     for (const r of rows) {
-      const sku = normalizar(r.sku).toLowerCase()
-      if (sku) skuCount.set(sku, (skuCount.get(sku) ?? 0) + 1)
+      const key = [normalizarClave(r.categoria), normalizarClave(r.producto), normalizarClave(r.tamano), normalizarClave(r.color), normalizarClave(r.tema)].join('||')
+      conteoCombos.set(key, (conteoCombos.get(key) ?? 0) + 1)
     }
 
-    return rows.map((r, i) => {
+    return rows.map((r) => {
       const errores = []
       const categoria = normalizar(r.categoria)
       const producto = normalizar(r.producto)
-      const sku = normalizar(r.sku)
+      const tamano = normalizar(r.tamano) || null
+      const color = normalizar(r.color) || null
+      const tema = normalizar(r.tema) || null
 
       if (!categoria) errores.push('Falta la categoría.')
       if (!producto) errores.push('Falta el producto.')
@@ -217,27 +329,38 @@ export default function ImportarExcelTab() {
         if (Number.isNaN(stockMinimo) || stockMinimo < 0) errores.push('Stock mínimo inválido.')
       }
 
-      if (sku && skuCount.get(sku.toLowerCase()) > 1) {
-        errores.push('SKU duplicado en el archivo.')
-      }
+      const codigoBarras = esCodigoVacio(r.sku) ? null : normalizar(r.sku)
 
-      const varianteExistente = sku ? variantesSku.get(sku.toLowerCase()) : null
+      const productoExistente = categoria && producto ? buscarProductoExistente(categoria, producto) : null
+      const varianteExistente = productoExistente
+        ? variantesCombo.get(comboKey(productoExistente.id, tamano, color, tema))
+        : null
+
+      const key = [normalizarClave(categoria), normalizarClave(producto), normalizarClave(tamano), normalizarClave(color), normalizarClave(tema)].join('||')
+      const esDuplicadoEnArchivo = categoria && producto && conteoCombos.get(key) > 1
+
+      let estado
+      if (errores.length > 0) estado = 'error'
+      else if (esDuplicadoEnArchivo) estado = 'conflicto'
+      else if (varianteExistente) estado = 'actualiza'
+      else estado = 'nueva'
 
       return {
-        rowNum: i + 2,
+        rowNum: r.rowNum,
         categoria,
         producto,
         descripcion: normalizar(r.descripcion) || null,
-        tamano: normalizar(r.tamano) || null,
-        color: normalizar(r.color) || null,
-        tema: normalizar(r.tema) || null,
-        sku: sku || null,
+        tamano,
+        color,
+        tema,
+        codigo_barras: codigoBarras,
         precio,
         costo,
         stock,
         stock_minimo: stockMinimo,
         varianteExistenteId: varianteExistente?.id ?? null,
-        estado: errores.length > 0 ? 'error' : varianteExistente ? 'actualiza' : 'nueva',
+        estado,
+        accion: estado === 'conflicto' ? (varianteExistente ? 'actualizar' : 'nueva') : null,
         errores,
       }
     })
@@ -248,11 +371,20 @@ export default function ImportarExcelTab() {
     e.target.value = ''
     if (!file) return
     setResumen(null)
-    const buffer = await file.arrayBuffer()
-    const wb = XLSX.read(buffer, { type: 'array' })
-    const ws = wb.Sheets[wb.SheetNames[0]]
-    const rows = XLSX.utils.sheet_to_json(ws, { defval: '' })
-    setFilas(validarFilas(rows))
+    setErrorArchivo(null)
+    setFilas([])
+    try {
+      const buffer = await file.arrayBuffer()
+      const wb = XLSX.read(buffer, { type: 'array' })
+      const rows = leerHojaInventario(wb)
+      setFilas(validarFilas(rows))
+    } catch (err) {
+      setErrorArchivo(err.message || 'No se pudo leer el archivo.')
+    }
+  }
+
+  function cambiarAccionFila(rowNum, accion) {
+    setFilas((prev) => prev.map((f) => (f.rowNum === rowNum ? { ...f, accion } : f)))
   }
 
   async function procesarImportacion(modo) {
@@ -267,6 +399,7 @@ export default function ImportarExcelTab() {
 
     const categoriasCache = [...categorias]
     const productosCache = [...productos]
+    const combosCache = new Map(variantesCombo)
 
     for (const fila of filas) {
       if (fila.estado === 'error') continue
@@ -275,12 +408,12 @@ export default function ImportarExcelTab() {
         if (fila.estado === 'actualiza' && modo === 'solo-nuevas') {
           resumenLocal.omitidas.push({
             rowNum: fila.rowNum,
-            motivo: 'Ya existe una variante con ese SKU (modo "solo agregar nuevas").',
+            motivo: 'Ya existe una variante con esa combinación producto/tamaño/color/tema (modo "solo agregar nuevas").',
           })
           continue
         }
 
-        let cat = categoriasCache.find((c) => c.nombre.toLowerCase() === fila.categoria.toLowerCase())
+        let cat = categoriasCache.find((c) => normalizarClave(c.nombre) === normalizarClave(fila.categoria))
         if (!cat) {
           const { data, error } = await supabase
             .from('categorias')
@@ -294,7 +427,7 @@ export default function ImportarExcelTab() {
         }
 
         let prod = productosCache.find(
-          (p) => p.categoria_id === cat.id && p.nombre.toLowerCase() === fila.producto.toLowerCase(),
+          (p) => p.categoria_id === cat.id && normalizarClave(p.nombre) === normalizarClave(fila.producto),
         )
         if (!prod) {
           const { data, error } = await supabase
@@ -308,9 +441,15 @@ export default function ImportarExcelTab() {
           resumenLocal.productosCreados += 1
         }
 
+        const key = comboKey(prod.id, fila.tamano, fila.color, fila.tema)
+        const existente = combosCache.get(key)
+        const accion = fila.estado === 'conflicto' ? fila.accion : fila.estado === 'actualiza' ? 'actualizar' : 'nueva'
+
+        // El sku interno NO se manda: lo genera el sistema (ver migración
+        // 20260717000000). Sólo se manda codigo_barras.
         const payloadVariante = {
           producto_id: prod.id,
-          sku: fila.sku,
+          codigo_barras: fila.codigo_barras,
           tamano: fila.tamano,
           color: fila.color,
           tema: fila.tema,
@@ -320,13 +459,14 @@ export default function ImportarExcelTab() {
           stock_minimo: fila.stock_minimo,
         }
 
-        if (fila.estado === 'actualiza') {
-          const { error } = await supabase.from('variantes').update(payloadVariante).eq('id', fila.varianteExistenteId)
+        if (accion === 'actualizar' && existente) {
+          const { error } = await supabase.from('variantes').update(payloadVariante).eq('id', existente.id)
           if (error) throw error
           resumenLocal.variantesActualizadas += 1
         } else {
-          const { error } = await supabase.from('variantes').insert(payloadVariante)
+          const { data, error } = await supabase.from('variantes').insert(payloadVariante).select().single()
           if (error) throw error
+          combosCache.set(key, data)
           resumenLocal.variantesCreadas += 1
         }
       } catch (err) {
@@ -349,7 +489,12 @@ export default function ImportarExcelTab() {
     { key: 'rowNum', label: 'Fila' },
     { key: 'categoria', label: 'Categoría' },
     { key: 'producto', label: 'Producto' },
-    { key: 'sku', label: 'SKU', render: (row) => row.sku ?? '—' },
+    {
+      key: 'variante',
+      label: 'Variante',
+      render: (row) => [row.tamano, row.color, row.tema].filter(Boolean).join(' · ') || '—',
+    },
+    { key: 'codigo_barras', label: 'Código de barras', render: (row) => row.codigo_barras ?? '—' },
     { key: 'precio', label: 'Precio', render: (row) => (Number.isNaN(row.precio) ? '—' : money(row.precio)) },
     {
       key: 'estado',
@@ -359,6 +504,23 @@ export default function ImportarExcelTab() {
           {ESTADO_LABEL[row.estado]}
         </span>
       ),
+    },
+    {
+      key: 'accion',
+      label: 'Acción',
+      render: (row) =>
+        row.estado === 'conflicto' ? (
+          <select
+            value={row.accion}
+            onChange={(e) => cambiarAccionFila(row.rowNum, e.target.value)}
+            className="rounded-lg border border-navy/20 px-2 py-1 text-xs"
+          >
+            <option value="actualizar">Actualizar existente</option>
+            <option value="nueva">Agregar como nueva</option>
+          </select>
+        ) : (
+          '—'
+        ),
     },
     {
       key: 'errores',
@@ -383,6 +545,10 @@ export default function ImportarExcelTab() {
         </label>
         {loadingCache && <span className="text-sm text-navy/60">Cargando catálogo actual…</span>}
       </div>
+
+      {errorArchivo && (
+        <div className="mb-6 rounded-lg bg-coral/10 px-4 py-3 text-sm text-coral">{errorArchivo}</div>
+      )}
 
       {resumen && (
         <div className="mb-6 rounded-lg bg-navy/5 px-4 py-3 text-sm text-navy/80">

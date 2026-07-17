@@ -10,6 +10,7 @@ import { ActivoBadge } from '../../../components/admin/ActivoBadge'
 const emptyForm = {
   id: null,
   sku: '',
+  codigo_barras: '',
   tamano: '',
   color: '',
   tema: '',
@@ -58,6 +59,7 @@ export default function VariantesTab() {
     setForm({
       id: variante.id,
       sku: variante.sku ?? '',
+      codigo_barras: variante.codigo_barras ?? '',
       tamano: variante.tamano ?? '',
       color: variante.color ?? '',
       tema: variante.tema ?? '',
@@ -82,7 +84,7 @@ export default function VariantesTab() {
 
     const payload = {
       producto_id: Number(productoId),
-      sku: form.sku.trim() || null,
+      codigo_barras: form.codigo_barras.trim() || null,
       tamano: form.tamano.trim() || null,
       color: form.color.trim() || null,
       tema: form.tema.trim() || null,
@@ -118,7 +120,8 @@ export default function VariantesTab() {
   }
 
   const columns = [
-    { key: 'sku', label: 'SKU', render: (row) => row.sku ?? '—' },
+    { key: 'sku', label: 'SKU interno', render: (row) => row.sku },
+    { key: 'codigo_barras', label: 'Código de barras', render: (row) => row.codigo_barras ?? '—' },
     {
       key: 'descripcion',
       label: 'Tamaño / Color / Tema',
@@ -195,7 +198,19 @@ export default function VariantesTab() {
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={form.id ? 'Editar variante' : 'Nueva variante'}>
         <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-2 gap-x-4">
-            <FormField label="SKU" value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} />
+            {form.id && (
+              <label className="mb-3 block text-sm">
+                <span className="mb-1 block font-medium text-navy">SKU interno</span>
+                <span className="block rounded-lg border border-navy/10 bg-navy/5 px-3 py-2 text-navy/70">
+                  {form.sku}
+                </span>
+              </label>
+            )}
+            <FormField
+              label="Código de barras"
+              value={form.codigo_barras}
+              onChange={(e) => setForm({ ...form, codigo_barras: e.target.value })}
+            />
             <FormField
               label="Precio"
               type="number"

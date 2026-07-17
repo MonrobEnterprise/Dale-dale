@@ -30,12 +30,17 @@ export default function PuntoVenta({ corte, onCerrarCaja }) {
   const [mensajeExito, setMensajeExito] = useState(null)
 
   const searchInputRef = useRef(null)
+  const [escaneoMultiple, setEscaneoMultiple] = useState([])
 
   // Lector de código de barras USB: emula teclado y termina con Enter. En vez
   // de intentar distinguirlo de tecleo manual (heurísticas de velocidad son
-  // frágiles y varían por modelo de lector), basta con: SKU exacto + Enter
-  // agrega directo al carrito. Un tecleo manual que no matchee un SKU exacto
-  // simplemente deja la búsqueda de texto normal como está.
+  // frágiles y varían por modelo de lector), basta con: código de barras
+  // exacto + Enter agrega directo al carrito. Un tecleo manual que no
+  // matchee un código de barras exacto simplemente deja la búsqueda de texto
+  // normal como está. El mismo código puede repetirse entre variantes
+  // distintas (ej. personajes surtidos bajo un solo código de fabricante),
+  // así que si el escaneo matchea a varias, se muestra una lista corta para
+  // que el cajero elija — nunca se agrega una al azar.
   useEffect(() => {
     if (!pagoAbierto && !cierreAbierto && !reimprimirAbierto) {
       searchInputRef.current?.focus()
@@ -45,7 +50,7 @@ export default function PuntoVenta({ corte, onCerrarCaja }) {
   async function loadVariantes() {
     const { data } = await supabase
       .from('variantes')
-      .select('id, sku, tamano, color, tema, precio, stock, productos!inner(nombre)')
+      .select('id, sku, codigo_barras, tamano, color, tema, precio, stock, productos!inner(nombre)')
       .eq('activo', true)
       .eq('productos.activo', true)
       .order('id')
@@ -78,6 +83,7 @@ export default function PuntoVenta({ corte, onCerrarCaja }) {
       ]
     })
     setSearch('')
+    setEscaneoMultiple([])
     searchInputRef.current?.focus()
   }
 
@@ -86,8 +92,12 @@ export default function PuntoVenta({ corte, onCerrarCaja }) {
     e.preventDefault()
     const q = search.trim().toLowerCase()
     if (!q) return
-    const match = variantes.find((v) => v.sku && v.sku.toLowerCase() === q)
-    if (match) agregarAlCarrito(match)
+    const coincidencias = variantes.filter((v) => v.codigo_barras && v.codigo_barras.toLowerCase() === q)
+    if (coincidencias.length === 1) {
+      agregarAlCarrito(coincidencias[0])
+    } else if (coincidencias.length > 1) {
+      setEscaneoMultiple(coincidencias)
+    }
   }
 
   function cambiarCantidad(varianteId, delta) {
@@ -227,9 +237,12 @@ export default function PuntoVenta({ corte, onCerrarCaja }) {
           onKeyDown={handleSearchKeyDown}
           placeholder="Busca por producto, SKU, tamaño, color o tema… (o escanea)"
         />
-        {resultados.length > 0 && (
+        {escaneoMultiple.length > 0 ? (
           <ul className="absolute z-10 mt-1 w-full rounded-lg border border-navy/10 bg-white shadow-lg">
-            {resultados.map((v) => (
+            <li className="px-3 py-2 text-xs font-medium text-navy/60">
+              Ese código corresponde a varias variantes, elige una:
+            </li>
+            {escaneoMultiple.map((v) => (
               <li key={v.id}>
                 <button
                   type="button"
@@ -245,6 +258,26 @@ export default function PuntoVenta({ corte, onCerrarCaja }) {
               </li>
             ))}
           </ul>
+        ) : (
+          resultados.length > 0 && (
+            <ul className="absolute z-10 mt-1 w-full rounded-lg border border-navy/10 bg-white shadow-lg">
+              {resultados.map((v) => (
+                <li key={v.id}>
+                  <button
+                    type="button"
+                    disabled={v.stock <= 0}
+                    onClick={() => agregarAlCarrito(v)}
+                    className={
+                      'block w-full px-3 py-2 text-left text-sm ' +
+                      (v.stock <= 0 ? 'cursor-not-allowed text-navy/30' : 'hover:bg-coral/5')
+                    }
+                  >
+                    {varianteLabel(v)} · stock: {v.stock} · {money(v.precio)}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )
         )}
       </div>
 
