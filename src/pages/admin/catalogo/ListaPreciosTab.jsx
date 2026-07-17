@@ -72,7 +72,7 @@ export default function ListaPreciosTab() {
 
   return (
     <div>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+      <div className="no-print mb-6 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-navy/70">
           {loading
             ? 'Cargando catálogo…'
@@ -99,14 +99,14 @@ export default function ListaPreciosTab() {
       </div>
 
       {!loading && totalVariantes === 0 && (
-        <p className="text-navy/60">No hay productos activos con variantes para incluir en la lista.</p>
+        <p className="no-print text-navy/60">No hay productos activos con variantes para incluir en la lista.</p>
       )}
 
       {/* Vista en pantalla: mismo documento que se imprime, para previsualizar
           antes de generar el PDF. El documento imprimible real está más
-          abajo (.price-list-print), oculto en pantalla (display:none). */}
+          abajo (.price-list-print), fuera de la vista en pantalla. */}
       {!loading && totalVariantes > 0 && (
-        <div className="overflow-hidden rounded-2xl bg-white shadow-lg">
+        <div className="no-print overflow-hidden rounded-2xl bg-white shadow-lg">
           <ListaPreciosDocumento categorias={categorias} fechaGeneracion={fechaGeneracion} />
         </div>
       )}

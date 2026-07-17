@@ -19,9 +19,9 @@ export default function CatalogoAdmin() {
 
   return (
     <AppShell>
-      <h2 className="mb-4 text-xl font-semibold text-navy">Catálogo</h2>
+      <h2 className="no-print mb-4 text-xl font-semibold text-navy">Catálogo</h2>
 
-      <div className="mb-6 flex gap-2 border-b border-navy/10">
+      <div className="no-print mb-6 flex gap-2 border-b border-navy/10">
         {TABS.map((t) => (
           <button
             key={t.key}

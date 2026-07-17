@@ -22,11 +22,15 @@ h1, h2, h3, h4 {
   font-family: var(--font-display);
 }
 
-/* .price-list-print no se muestra en pantalla; sólo existe para @media
-   print. display:none (no visibility) porque así no reserva espacio en
-   el layout normal de la pestaña. */
+/* .price-list-print no se ve en pantalla, pero NUNCA lleva display:none:
+   Chrome no recalcula bien el layout de una tabla larga que estuvo en
+   display:none al pasar a @media print — el resultado es una sola hoja en
+   blanco. Se saca de la vista con position:absolute fuera del viewport en
+   vez de ocultarla, así su contenido siempre está medido/dispuesto. */
 .price-list-print {
-  display: none;
+  position: absolute;
+  top: 0;
+  left: -99999px;
 }
 
 /* Impresión de tickets (impresora térmica 58mm) y de la lista de precios
@@ -39,10 +43,13 @@ h1, h2, h3, h4 {
    bloque corto, nunca pasa de una página). La lista de precios NO puede
    usar position:absolute: Chrome no pagina bien contenido posicionado de
    forma absoluta que mide más de una página — el resultado son hojas en
-   blanco. En su lugar, todo lo que no sea el documento imprimible se saca
-   del flujo con display:none (vía :has/:not, sólo cuando existe un
-   .price-list-print en la página), y el documento fluye normal, paginando
-   como cualquier contenido largo. */
+   blanco.
+
+   Para sacar del flujo todo lo que no sea el documento imprimible se usa
+   una lista explícita (header, nav, .no-print) y NO `*:not(...)` con el
+   selector universal: esa combinación (probada con Chrome/Playwright)
+   deja la hoja completamente en blanco al imprimir contenido de varias
+   páginas — es una limitación real del motor de impresión, no un typo. */
 @media print {
   html, body {
     visibility: hidden;
@@ -68,11 +75,13 @@ h1, h2, h3, h4 {
     margin: 0;
   }
 
-  body:has(.price-list-print) *:not(.price-list-print, .price-list-print *) {
+  header,
+  nav,
+  .no-print {
     display: none !important;
   }
   .price-list-print {
-    display: block;
+    position: static;
     page: listaPrecios;
   }
   @page listaPrecios {
