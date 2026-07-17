@@ -4,12 +4,14 @@ import CategoriasTab from './catalogo/CategoriasTab'
 import ProductosTab from './catalogo/ProductosTab'
 import VariantesTab from './catalogo/VariantesTab'
 import ImportarExcelTab from './catalogo/ImportarExcelTab'
+import ListaPreciosTab from './catalogo/ListaPreciosTab'
 
 const TABS = [
   { key: 'categorias', label: 'Categorías' },
   { key: 'productos', label: 'Productos' },
   { key: 'variantes', label: 'Variantes' },
   { key: 'importar', label: 'Importar Excel' },
+  { key: 'precios', label: 'Lista de precios' },
 ]
 
 export default function CatalogoAdmin() {
@@ -39,6 +41,7 @@ export default function CatalogoAdmin() {
       {tab === 'productos' && <ProductosTab />}
       {tab === 'variantes' && <VariantesTab />}
       {tab === 'importar' && <ImportarExcelTab />}
+      {tab === 'precios' && <ListaPreciosTab />}
     </AppShell>
   )
 }

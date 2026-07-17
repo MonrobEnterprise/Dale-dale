@@ -22,9 +22,19 @@ h1, h2, h3, h4 {
   font-family: var(--font-display);
 }
 
-/* Impresión de tickets (impresora térmica 58mm). Se usan mm (no px) tanto en
-   @page como en el ancho del ticket para que el tamaño sea exacto sin
-   depender de la resolución de pantalla del navegador. */
+/* .price-list-print vive fuera de pantalla (no basta con "hidden" de
+   Tailwind: display:none no se puede revertir con visibility en el
+   @media print de abajo). Sólo se muestra durante la impresión. */
+.price-list-print {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+}
+
+/* Impresión de tickets (impresora térmica 58mm) y de la lista de precios
+   (carta, a color). Cada una usa una @page con nombre porque el tamaño de
+   página en impresión no se puede condicionar con selectores normales — el
+   nombre se asigna al elemento imprimible vía la propiedad `page`. */
 @media print {
   html, body {
     visibility: hidden;
@@ -34,7 +44,9 @@ h1, h2, h3, h4 {
     visibility: hidden;
   }
   .ticket-print,
-  .ticket-print * {
+  .ticket-print *,
+  .price-list-print,
+  .price-list-print * {
     visibility: visible;
   }
   .ticket-print {
@@ -42,8 +54,24 @@ h1, h2, h3, h4 {
     top: 0;
     left: 0;
   }
-  @page {
+  .price-list-print {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+  .ticket-print {
+    page: ticket58;
+  }
+  .price-list-print {
+    page: listaPrecios;
+  }
+  @page ticket58 {
     size: 58mm auto;
     margin: 0;
+  }
+  @page listaPrecios {
+    size: letter;
+    margin: 14mm;
   }
 }
